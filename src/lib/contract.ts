@@ -1,24 +1,128 @@
-export const CONTRACT_ADDRESS = "0xPLACEHOLDER"; // TODO: paste real ABI after deployment
+export const CHAINCHAMA_ADDRESS = "0x...YOUR_CONTRACT_ADDRESS_HERE...";
 
-// ABI for the ChainChama smart contract
-export const CONTRACT_ABI = [
-  "function joinGroup(string _name) external",
-  "function startGroup() external",
-  "function contribute() external payable",
-  "function triggerPayout() external",
-  "function getMembers() external view returns (address[])",
-  "function getMemberCount() external view returns (uint256)",
-  "function getCycleHistory() external view returns (tuple(uint256 cycleNumber, address recipient, uint256 amountPaid, uint256 timestamp)[])",
-  "function getBalance() external view returns (uint256)",
-  "function getCurrentRecipient() external view returns (address)",
-  "function getContributionStatus() external view returns (address[] members, bool[] hasContributed)",
-  "function getMemberDetails(address member) external view returns (string name, uint256 totalContributed, bool hasReceivedPayout, bool contributedThisCycle)",
-  "function timeUntilDeadline() external view returns (uint256)",
-  "function groupName() external view returns (string)",
-  "function admin() external view returns (address)",
-  "function contributionAmount() external view returns (uint256)",
-  "function maxMembers() external view returns (uint256)",
-  "function currentCycle() external view returns (uint256)",
-  "function cycleDeadline() external view returns (uint256)",
-  "function isActive() external view returns (bool)"
+export const CHAINCHAMA_ABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_groupId",
+        "type": "uint256"
+      }
+    ],
+    "name": "contribute",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "_name",
+        "type": "string"
+      }
+    ],
+    "name": "createGroup",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_groupId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getGroupBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_groupId",
+        "type": "uint256"
+      }
+    ],
+    "name": "joinGroup",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "contributions",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "groupCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "groups",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalFunds",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
 ];

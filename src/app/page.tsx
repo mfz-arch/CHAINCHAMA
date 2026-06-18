@@ -28,6 +28,8 @@ interface Group {
   members: Member[];
 }
 
+import { CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI } from '@/lib/contract';
+
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -79,34 +81,56 @@ export default function Home() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!walletAddress) {
+      showToast("Please connect your wallet first", "error");
+      return;
+    }
+    
     setIsCreating(true);
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 1500));
     
-    const newGroup: Group = {
-      ...createForm,
-      amount: Number(createForm.amount),
-      minMembers: Number(createForm.minMembers),
-      id: createForm.code,
-      status: 'PENDING',
-      members: [{
-        name: createForm.chairmanName,
-        phone: createForm.chairmanPhone,
-        joinedAt: Date.now()
-      }]
-    };
-    
-    setGroups(prev => [...prev, newGroup]);
-    setActiveGroupCode(newGroup.id);
-    setIsCreating(false);
-    setCreateSuccess(true);
-    showToast("Group Created Successfully");
-    
-    setTimeout(() => {
-      setCreateSuccess(false);
-      setIsCreateModalOpen(false);
-      setCreateForm({ name: '', code: '', chairmanName: '', chairmanPhone: '', amount: '', cycle: 'Weekly', minMembers: '' });
-    }, 1500);
+    try {
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      
+      // If CHAINCHAMA_ADDRESS is not set yet, we bypass contract call for the UI
+      if (CHAINCHAMA_ADDRESS.includes("YOUR_CONTRACT_ADDRESS")) {
+        console.warn("Contract address not set! Bypassing blockchain transaction.");
+        await new Promise(r => setTimeout(r, 1500)); // Simulate delay
+      } else {
+        const contract = new ethers.Contract(CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI, signer);
+        const tx = await contract.createGroup(createForm.name);
+        await tx.wait(); // Wait for transaction to be mined
+      }
+      
+      const newGroup: Group = {
+        ...createForm,
+        amount: Number(createForm.amount),
+        minMembers: Number(createForm.minMembers),
+        id: createForm.code,
+        status: 'PENDING',
+        members: [{
+          name: createForm.chairmanName,
+          phone: createForm.chairmanPhone,
+          joinedAt: Date.now()
+        }]
+      };
+      
+      setGroups(prev => [...prev, newGroup]);
+      setActiveGroupCode(newGroup.id);
+      setCreateSuccess(true);
+      showToast("Group Created Successfully!");
+      
+      setTimeout(() => {
+        setCreateSuccess(false);
+        setIsCreateModalOpen(false);
+        setCreateForm({ name: '', code: '', chairmanName: '', chairmanPhone: '', amount: '', cycle: '7', minMembers: '' });
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error creating group:", error);
+      showToast(error?.message || "Failed to create group", "error");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleCodeCheck = (code: string) => {
@@ -118,31 +142,61 @@ export default function Home() {
   const handleJoinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!foundGroup) return;
+    if (!walletAddress) {
+      showToast("Please connect your wallet first", "error");
+      return;
+    }
+    
     setIsJoining(true);
     
-    // Simulate network delay
-    await new Promise(r => setTimeout(r, 1500));
-    
-    const newMember: Member = {
-      name: joinForm.name,
-      phone: joinForm.phone,
-      joinedAt: Date.now()
-    };
-
-    setGroups(prev => prev.map(g => {
-      if (g.id === foundGroup.id) {
-         return { ...g, members: [...g.members, newMember] };
+    try {
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      
+      if (CHAINCHAMA_ADDRESS.includes("YOUR_CONTRACT_ADDRESS")) {
+        console.warn("Contract address not set! Bypassing blockchain transaction.");
+        await new Promise(r => setTimeout(r, 1500)); // Simulate network delay
+      } else {
+        const contract = new ethers.Contract(CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI, signer);
+        
+        // Use a mock groupId for the MVP (e.g. 1) as the smart contract expects an integer
+        // In a real app, the groupCode would map to the integer ID.
+        const mockGroupId = 1; 
+        
+        // Join group & contribute 
+        // According to the tutorial, you contribute value when joining.
+        // We parse the group's required amount to send it with the tx.
+        const tx = await contract.contribute(mockGroupId, {
+          value: ethers.parseEther(foundGroup.amount.toString())
+        });
+        await tx.wait();
       }
-      return g;
-    }));
-    setActiveGroupCode(foundGroup.id);
-    
-    setIsJoining(false);
-    showToast("Successfully Joined Group");
-    setIsJoinModalOpen(false);
-    setJoinStep(1);
-    setJoinForm({ code: '', name: '', phone: '' });
-    setFoundGroup(null);
+      
+      const newMember: Member = {
+        name: joinForm.name,
+        phone: joinForm.phone,
+        joinedAt: Date.now()
+      };
+
+      setGroups(prev => prev.map(g => {
+        if (g.id === foundGroup.id) {
+           return { ...g, members: [...g.members, newMember] };
+        }
+        return g;
+      }));
+      setActiveGroupCode(foundGroup.id);
+      
+      showToast("Successfully Joined Group");
+      setIsJoinModalOpen(false);
+      setJoinStep(1);
+      setJoinForm({ code: '', name: '', phone: '' });
+      setFoundGroup(null);
+    } catch (error: any) {
+      console.error("Error joining group:", error);
+      showToast(error?.message || "Failed to join group", "error");
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   const activeGroup = groups.find(g => g.id === activeGroupCode);
