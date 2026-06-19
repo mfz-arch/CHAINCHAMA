@@ -411,13 +411,14 @@ export default function Home() {
 
   const displayMembers = activeGroup ? activeGroup.members.map((m, i) => ({
     name: m.name,
+    walletAddress: m.walletAddress,
     status: i === 0 ? 'Next' : 'Waiting'
   })) : [
-    { name: "Amani", status: "Received" },
-    { name: "Baraka", status: "Next" },
-    { name: "Chausiku", status: "Waiting" },
-    { name: "Dunia", status: "Waiting" },
-    { name: "Elidi", status: "Waiting" }
+    { name: "Amani", walletAddress: "0x0000000000000000000000000000000000000000", status: "Received" },
+    { name: "Baraka", walletAddress: "0x0000000000000000000000000000000000000000", status: "Next" },
+    { name: "Chausiku", walletAddress: "0x0000000000000000000000000000000000000000", status: "Waiting" },
+    { name: "Dunia", walletAddress: "0x0000000000000000000000000000000000000000", status: "Waiting" },
+    { name: "Elidi", walletAddress: "0x0000000000000000000000000000000000000000", status: "Waiting" }
   ];
 
   return (
