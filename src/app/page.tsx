@@ -379,10 +379,10 @@ export default function Home() {
               <button onClick={() => setCurrentView('home')} className={`${currentView === 'home' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-900'} transition-colors`}>Home</button>
               
               {/* Auto-detect Chairman login */}
-              {groups.some(g => g.admin.toLowerCase() === walletAddress?.toLowerCase()) && (
+              {walletAddress && groups.some(g => g.admin.toLowerCase() === (walletAddress || '').toLowerCase()) && (
                 <button 
                   onClick={() => {
-                    const g = groups.find(g => g.admin.toLowerCase() === walletAddress?.toLowerCase());
+                    const g = groups.find(g => g.admin.toLowerCase() === (walletAddress || '').toLowerCase());
                     if (g) {
                       setActiveGroupCode(g.id);
                       setCurrentUserRole('chairman');
@@ -396,10 +396,10 @@ export default function Home() {
               )}
 
               {/* Auto-detect Member login */}
-              {groups.some(g => g.members.some(m => m.walletAddress.toLowerCase() === walletAddress?.toLowerCase()) || g.requests.some(r => r.userWallet.toLowerCase() === walletAddress?.toLowerCase())) && (
+              {walletAddress && groups.some(g => g.members.some(m => m.walletAddress.toLowerCase() === (walletAddress || '').toLowerCase()) || g.requests.some(r => r.userWallet.toLowerCase() === (walletAddress || '').toLowerCase())) && (
                 <button 
                   onClick={() => {
-                    const g = groups.find(g => g.members.some(m => m.walletAddress.toLowerCase() === walletAddress?.toLowerCase()) || g.requests.some(r => r.userWallet.toLowerCase() === walletAddress?.toLowerCase()));
+                    const g = groups.find(g => g.members.some(m => m.walletAddress.toLowerCase() === (walletAddress || '').toLowerCase()) || g.requests.some(r => r.userWallet.toLowerCase() === (walletAddress || '').toLowerCase()));
                     if (g) {
                       setActiveGroupCode(g.id);
                       setCurrentUserRole('member');
