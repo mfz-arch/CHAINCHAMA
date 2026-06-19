@@ -379,10 +379,10 @@ export default function Home() {
               <button onClick={() => setCurrentView('home')} className={`${currentView === 'home' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-900'} transition-colors`}>Home</button>
               
               {/* Auto-detect Chairman login */}
-              {walletAddress && groups.some(g => g.admin.toLowerCase() === (walletAddress || '').toLowerCase()) && (
+              {walletAddress && groups.some(g => g.chairmanWallet.toLowerCase() === (walletAddress || '').toLowerCase()) && (
                 <button 
                   onClick={() => {
-                    const g = groups.find(g => g.admin.toLowerCase() === (walletAddress || '').toLowerCase());
+                    const g = groups.find(g => g.chairmanWallet.toLowerCase() === (walletAddress || '').toLowerCase());
                     if (g) {
                       setActiveGroupCode(g.id);
                       setCurrentUserRole('chairman');
