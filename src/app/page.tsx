@@ -78,7 +78,7 @@ export default function Home() {
   const disconnectWallet = () => {
     setWalletAddress(null);
     setCurrentView('home');
-    setCurrentUserRole('none');
+    setCurrentUserRole(null);
     setActiveGroupCode(null);
     showToast("Wallet disconnected");
   };
@@ -90,7 +90,7 @@ export default function Home() {
         if (accounts.length > 0) {
           setWalletAddress(accounts[0]);
           setCurrentView('home'); // Send them back to home page on account switch
-          setCurrentUserRole('none');
+          setCurrentUserRole(null);
           setActiveGroupCode(null);
           showToast(`Wallet switched to ${accounts[0].substring(0,6)}...`, "success");
         } else {
