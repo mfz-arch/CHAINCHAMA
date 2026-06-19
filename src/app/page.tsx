@@ -81,9 +81,11 @@ export default function Home() {
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length > 0) {
           setWalletAddress(accounts[0]);
+          setCurrentView('home'); // Send them back to home page on account switch
           showToast(`Wallet switched to ${accounts[0].substring(0,6)}...`, "success");
         } else {
           setWalletAddress(null);
+          setCurrentView('home');
         }
       };
       (window as any).ethereum.on('accountsChanged', handleAccountsChanged);
