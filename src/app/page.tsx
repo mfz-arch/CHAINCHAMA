@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Wallet, Users, ArrowRightLeft, ShieldCheck, Activity, X, Copy, CheckCircle2, Loader2 } from 'lucide-react';
+import { Wallet, Users, ArrowRightLeft, ShieldCheck, Activity, X, Copy, CheckCircle2, Loader2, Bell, Check, XCircle } from 'lucide-react';
 import { ethers } from 'ethers';
+import { CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI } from '@/lib/contract';
 
 declare global {
   interface Window {
@@ -13,7 +14,18 @@ declare global {
 interface Member {
   name: string;
   phone: string;
+  walletAddress: string;
   joinedAt: number;
+}
+
+interface JoinRequest {
+  id: string;
+  groupCode: string;
+  userWallet: string;
+  name: string;
+  phone: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  requestedAt: number;
 }
 
 interface Group {
@@ -21,36 +33,43 @@ interface Group {
   name: string;
   chairmanName: string;
   chairmanPhone: string;
+  chairmanWallet: string;
   amount: number;
   cycle: string;
   minMembers: number;
-  status: string;
+  maxMembers: number;
+  status: 'PENDING' | 'ACTIVE';
   members: Member[];
+  requests: JoinRequest[];
 }
 
-import { CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI } from '@/lib/contract';
+type Role = 'chairman' | 'member' | null;
+type ViewState = 'home' | 'dashboard' | 'pending';
 
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // App State
+  // App & Global State
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeGroupCode, setActiveGroupCode] = useState<string | null>(null);
+  
+  // Navigation & Roles
+  const [currentUserRole, setCurrentUserRole] = useState<Role>(null);
+  const [currentView, setCurrentView] = useState<ViewState>('home');
   
   // UI State
   const [toast, setToast] = useState<{message: string, type: 'success'|'error'} | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
 
-  // Create Group Form State
+  // Create Group Form
   const [createForm, setCreateForm] = useState({
-    name: '', code: '', chairmanName: '', chairmanPhone: '', amount: '', cycle: '7', minMembers: ''
+    name: '', code: '', chairmanName: '', chairmanPhone: '', amount: '', cycle: '7', minMembers: '', maxMembers: '5'
   });
   const [isCreating, setIsCreating] = useState(false);
-  const [createSuccess, setCreateSuccess] = useState(false);
 
-  // Join Group Form State
+  // Join Group Form
   const [joinStep, setJoinStep] = useState(1);
   const [joinForm, setJoinForm] = useState({ code: '', name: '', phone: '' });
   const [isJoining, setIsJoining] = useState(false);
@@ -92,39 +111,42 @@ export default function Home() {
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       
-      // If CHAINCHAMA_ADDRESS is not set yet, we bypass contract call for the UI
       if (CHAINCHAMA_ADDRESS.includes("YOUR_CONTRACT_ADDRESS")) {
         console.warn("Contract address not set! Bypassing blockchain transaction.");
         await new Promise(r => setTimeout(r, 1500)); // Simulate delay
       } else {
         const contract = new ethers.Contract(CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI, signer);
         const tx = await contract.createGroup(createForm.name);
-        await tx.wait(); // Wait for transaction to be mined
+        await tx.wait(); 
       }
       
       const newGroup: Group = {
         ...createForm,
         amount: Number(createForm.amount),
         minMembers: Number(createForm.minMembers),
+        maxMembers: Number(createForm.maxMembers),
         id: createForm.code,
+        chairmanWallet: walletAddress,
         status: 'PENDING',
         members: [{
           name: createForm.chairmanName,
           phone: createForm.chairmanPhone,
+          walletAddress: walletAddress,
           joinedAt: Date.now()
-        }]
+        }],
+        requests: []
       };
       
       setGroups(prev => [...prev, newGroup]);
       setActiveGroupCode(newGroup.id);
-      setCreateSuccess(true);
-      showToast("Group Created Successfully!");
       
-      setTimeout(() => {
-        setCreateSuccess(false);
-        setIsCreateModalOpen(false);
-        setCreateForm({ name: '', code: '', chairmanName: '', chairmanPhone: '', amount: '', cycle: '7', minMembers: '' });
-      }, 2000);
+      // Assign Role & Navigation
+      setCurrentUserRole('chairman');
+      setCurrentView('dashboard');
+      
+      showToast("Group Created Successfully!");
+      setIsCreateModalOpen(false);
+      setCreateForm({ name: '', code: '', chairmanName: '', chairmanPhone: '', amount: '', cycle: '7', minMembers: '', maxMembers: '5' });
     } catch (error: any) {
       console.error("Error creating group:", error);
       showToast(error?.message || "Failed to create group", "error");
@@ -140,7 +162,7 @@ export default function Home() {
     setFoundGroup(group || null);
   };
 
-  const handleJoinSubmit = async (e: React.FormEvent) => {
+  const handleJoinRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!foundGroup) return;
     if (!walletAddress) {
@@ -151,58 +173,91 @@ export default function Home() {
     setIsJoining(true);
     
     try {
-      const provider = new ethers.BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
-      
-      if (CHAINCHAMA_ADDRESS.includes("YOUR_CONTRACT_ADDRESS")) {
-        console.warn("Contract address not set! Bypassing blockchain transaction.");
-        await new Promise(r => setTimeout(r, 1500)); // Simulate network delay
-      } else {
-        const contract = new ethers.Contract(CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI, signer);
-        
-        // Use a mock groupId for the MVP (e.g. 1) as the smart contract expects an integer
-        // In a real app, the groupCode would map to the integer ID.
-        const mockGroupId = 1; 
-        
-        // Join group & contribute 
-        // According to the tutorial, you contribute value when joining.
-        // We parse the group's required amount to send it with the tx.
-        const tx = await contract.contribute(mockGroupId, {
-          value: ethers.parseEther(foundGroup.amount.toString())
-        });
-        await tx.wait();
-      }
-      
-      const newMember: Member = {
+      // Create Join Request instead of directly joining
+      const newRequest: JoinRequest = {
+        id: Math.random().toString(36).substr(2, 9),
+        groupCode: foundGroup.id,
+        userWallet: walletAddress,
         name: joinForm.name,
         phone: joinForm.phone,
-        joinedAt: Date.now()
+        status: 'PENDING',
+        requestedAt: Date.now()
       };
 
       setGroups(prev => prev.map(g => {
         if (g.id === foundGroup.id) {
-           return { ...g, members: [...g.members, newMember] };
+           return { ...g, requests: [...g.requests, newRequest] };
         }
         return g;
       }));
-      setActiveGroupCode(foundGroup.id);
       
-      showToast("Successfully Joined Group");
+      setActiveGroupCode(foundGroup.id);
+      setCurrentUserRole('member');
+      setCurrentView('pending');
+      
+      showToast("Join Request Sent!");
       setIsJoinModalOpen(false);
       setJoinStep(1);
       setJoinForm({ code: '', name: '', phone: '' });
       setFoundGroup(null);
     } catch (error: any) {
-      console.error("Error joining group:", error);
-      showToast(error?.message || "Failed to join group", "error");
+      console.error("Error sending join request:", error);
+      showToast("Failed to send request", "error");
     } finally {
       setIsJoining(false);
     }
   };
 
+  const handleApproveRequest = async (reqId: string, isApproved: boolean) => {
+    const activeGroup = groups.find(g => g.id === activeGroupCode);
+    if (!activeGroup) return;
+
+    if (isApproved) {
+      // NOTE: In a full on-chain app, the user would need to contribute AVAX here.
+      // We simulate moving them to members array.
+      const req = activeGroup.requests.find(r => r.id === reqId);
+      if (!req) return;
+
+      const newMember: Member = {
+        name: req.name,
+        phone: req.phone,
+        walletAddress: req.userWallet,
+        joinedAt: Date.now()
+      };
+
+      setGroups(prev => prev.map(g => {
+        if (g.id === activeGroup.id) {
+          const updatedMembers = [...g.members, newMember];
+          // Check activation
+          const newStatus = updatedMembers.length >= g.minMembers ? 'ACTIVE' : g.status;
+          return { 
+            ...g, 
+            members: updatedMembers, 
+            requests: g.requests.filter(r => r.id !== reqId),
+            status: newStatus 
+          };
+        }
+        return g;
+      }));
+      showToast("Member Approved!");
+    } else {
+      setGroups(prev => prev.map(g => {
+        if (g.id === activeGroup.id) {
+          return { ...g, requests: g.requests.filter(r => r.id !== reqId) };
+        }
+        return g;
+      }));
+      showToast("Request Rejected");
+    }
+  };
+
+  const handleStartCycle = () => {
+    showToast("Cycle Started Successfully!");
+    // Logic for smart contract cycle start would go here
+  };
+
   const activeGroup = groups.find(g => g.id === activeGroupCode);
 
-  // Use activeGroup members for the circle, or fallback to default examples
   const displayMembers = activeGroup ? activeGroup.members.map((m, i) => ({
     name: m.name,
     status: i === 0 ? 'Next' : 'Waiting'
@@ -232,11 +287,21 @@ export default function Home() {
       {/* Navigation */}
       <nav className="fixed w-full z-40 top-0 border-b border-stone-200 bg-white/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-amber-600/30">
-              C
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCurrentView('home')}>
+              <div className="w-10 h-10 bg-amber-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-amber-600/30">
+                C
+              </div>
+              <span className="text-2xl font-extrabold text-stone-900 tracking-tight">ChainChama</span>
             </div>
-            <span className="text-2xl font-extrabold text-stone-900 tracking-tight">ChainChama</span>
+            
+            {/* Global Nav Links */}
+            <div className="hidden md:flex gap-4 border-l border-stone-200 pl-6">
+              <button onClick={() => setCurrentView('home')} className={`font-bold transition-colors ${currentView === 'home' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-900'}`}>Home</button>
+              {currentUserRole === 'chairman' && (
+                <button onClick={() => setCurrentView('dashboard')} className={`font-bold transition-colors ${currentView === 'dashboard' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-900'}`}>Dashboard</button>
+              )}
+            </div>
           </div>
           
           <button 
@@ -250,234 +315,326 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Main View Logic */}
       <main className="pt-32 pb-20 px-6 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          
-          {/* Left: Copy & Actions */}
-          <div className="space-y-8 relative z-10">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 text-amber-800 font-semibold text-sm">
-              <Activity size={16} />
-              Avalanche Fuji Testnet Live
-            </div>
-            <h1 className="text-6xl md:text-7xl font-black text-stone-900 leading-[1.1] tracking-tight">
-              Community Savings,<br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-500">
-                Secured by Trust.
-              </span>
-            </h1>
-            <p className="text-xl text-stone-600 leading-relaxed max-w-lg">
-              ChainChama brings the traditional East African savings group to the blockchain. Transparent, automated, and community-driven.
-            </p>
+        
+        {/* VIEW: HOME */}
+        {currentView === 'home' && (
+          <div className="grid lg:grid-cols-2 gap-16 items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Left: Copy & Actions */}
+            <div className="space-y-8 relative z-10">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 text-amber-800 font-semibold text-sm">
+                <Activity size={16} />
+                Avalanche Fuji Testnet Live
+              </div>
+              <h1 className="text-6xl md:text-7xl font-black text-stone-900 leading-[1.1] tracking-tight">
+                Community Savings,<br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-500">
+                  Secured by Trust.
+                </span>
+              </h1>
+              <p className="text-xl text-stone-600 leading-relaxed max-w-lg">
+                ChainChama brings the traditional East African savings group to the blockchain. Transparent, automated, and community-driven.
+              </p>
 
-            {/* Generated Group Card */}
-            {activeGroup && (
-              <div className="bg-white p-6 rounded-3xl shadow-lg shadow-stone-200/50 border border-stone-200 animate-in fade-in slide-in-from-bottom-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-2xl font-black text-stone-900">{activeGroup.name}</h3>
-                  <span className="px-4 py-1.5 bg-amber-100 text-amber-800 text-xs font-black rounded-full uppercase tracking-wider">
-                    {activeGroup.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 bg-stone-50 p-4 rounded-xl border border-stone-200">
-                  <span className="text-stone-500 font-mono text-sm uppercase tracking-widest font-bold">Code</span>
-                  <span className="font-bold text-stone-900 font-mono text-lg">{activeGroup.id}</span>
+              <div className="flex flex-wrap gap-4 pt-4">
+                {currentUserRole !== 'chairman' && (
                   <button 
-                    onClick={() => { navigator.clipboard.writeText(activeGroup.id); showToast("Code copied!"); }}
-                    className="ml-auto text-stone-400 hover:text-amber-600 transition-colors p-2 hover:bg-amber-50 rounded-lg"
-                    title="Copy Code"
+                    onClick={() => setIsJoinModalOpen(true)}
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-lg shadow-amber-600/25 hover:shadow-xl hover:-translate-y-1"
                   >
-                    <Copy size={18} />
+                    Request to Join
                   </button>
-                </div>
-                <div className="mt-6 grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Contribution</p>
-                    <p className="font-black text-stone-900 text-lg">{activeGroup.amount} AVAX <span className="text-sm font-medium text-stone-500 block">{activeGroup.cycle} Days</span></p>
-                  </div>
-                  <div>
-                    <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Members</p>
-                    <p className="font-black text-stone-900 text-lg">{activeGroup.members.length} <span className="text-sm font-medium text-stone-500">/ {activeGroup.minMembers}</span></p>
-                  </div>
-                </div>
+                )}
+                <button 
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="bg-white hover:bg-stone-100 text-stone-900 border border-stone-200 px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-sm hover:shadow-md"
+                >
+                  Create Group
+                </button>
               </div>
-            )}
-            
-            <div className="flex flex-wrap gap-4 pt-4">
-              <button 
-                onClick={() => setIsJoinModalOpen(true)}
-                className="bg-amber-600 hover:bg-amber-700 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-lg shadow-amber-600/25 hover:shadow-xl hover:-translate-y-1"
-              >
-                Join a Chama
-              </button>
-              <button 
-                onClick={() => setIsCreateModalOpen(true)}
-                className="bg-white hover:bg-stone-100 text-stone-900 border border-stone-200 px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-sm hover:shadow-md"
-              >
-                Create Group
-              </button>
             </div>
-          </div>
 
-          {/* Right: Circular Rotation UI */}
-          <div className="relative h-[600px] w-full flex items-center justify-center">
-            <div className="absolute inset-0 bg-gradient-to-tr from-amber-100 to-orange-50 rounded-[3rem] -rotate-3 scale-95 opacity-50"></div>
-            
-            <div className="relative w-80 h-80 rounded-full border-[12px] border-white shadow-2xl bg-stone-50 flex items-center justify-center z-10">
-              <div className="text-center">
-                <p className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-1">Current Pot</p>
-                <p className="text-4xl font-black text-stone-900">
-                  {activeGroup ? activeGroup.amount * activeGroup.members.length : 500} <span className="text-2xl">AVAX</span>
-                </p>
-                <p className="text-amber-600 font-medium mt-2 flex items-center justify-center gap-1">
-                  {activeGroup && activeGroup.members.length < activeGroup.minMembers 
-                    ? `Waiting for ${activeGroup.minMembers - activeGroup.members.length} members` 
-                    : 'Next payout in 4d'}
-                </p>
-              </div>
+            {/* Right: Circular Rotation UI */}
+            <div className="relative h-[600px] w-full flex items-center justify-center">
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-100 to-orange-50 rounded-[3rem] -rotate-3 scale-95 opacity-50"></div>
+              
+              <div className="relative w-80 h-80 rounded-full border-[12px] border-white shadow-2xl bg-stone-50 flex items-center justify-center z-10">
+                <div className="text-center">
+                  <p className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-1">Current Pot</p>
+                  <p className="text-4xl font-black text-stone-900">
+                    {activeGroup ? activeGroup.amount * activeGroup.members.length : 500} <span className="text-2xl">AVAX</span>
+                  </p>
+                </div>
 
-              {/* Members Orbit */}
-              {displayMembers.map((member, i) => {
-                const angle = (i * (360 / displayMembers.length)) - 90; // Start top
-                const radius = 180;
-                const x = radius * Math.cos((angle * Math.PI) / 180);
-                const y = radius * Math.sin((angle * Math.PI) / 180);
+                {/* Members Orbit */}
+                {displayMembers.map((member, i) => {
+                  const angle = (i * (360 / displayMembers.length)) - 90;
+                  const radius = 180;
+                  const x = radius * Math.cos((angle * Math.PI) / 180);
+                  const y = radius * Math.sin((angle * Math.PI) / 180);
 
-                const isNext = member.status === 'Next';
-                const isReceived = member.status === 'Received';
+                  const isNext = member.status === 'Next';
+                  const isReceived = member.status === 'Received';
 
-                return (
-                  <div 
-                    key={member.name + i}
-                    className="absolute transition-all duration-700"
-                    style={{ transform: `translate(${x}px, ${y}px)` }}
-                  >
-                    <div className={`relative group flex flex-col items-center`}>
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-xl transition-transform hover:scale-110 cursor-pointer
-                        ${isNext ? 'bg-amber-500 ring-4 ring-amber-500/30' : 
-                          isReceived ? 'bg-stone-300' : 'bg-stone-800'}
-                      `}>
-                        {member.name.charAt(0)}
-                      </div>
-                      
-                      <div className="absolute top-full mt-2 bg-white px-3 py-1.5 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20 border border-stone-100">
-                        <p className="font-bold text-stone-900">{member.name}</p>
-                        <p className={`text-xs font-semibold ${isNext ? 'text-amber-600' : isReceived ? 'text-stone-500' : 'text-stone-700'}`}>
-                          {member.status}
-                        </p>
+                  return (
+                    <div 
+                      key={member.name + i}
+                      className="absolute transition-all duration-700"
+                      style={{ transform: `translate(${x}px, ${y}px)` }}
+                    >
+                      <div className={`relative group flex flex-col items-center`}>
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-xl transition-transform hover:scale-110 cursor-pointer
+                          ${isNext ? 'bg-amber-500 ring-4 ring-amber-500/30' : 
+                            isReceived ? 'bg-stone-300' : 'bg-stone-800'}
+                        `}>
+                          {member.name.charAt(0)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
+        )}
 
-        </div>
+        {/* VIEW: CHAIRMAN DASHBOARD */}
+        {currentView === 'dashboard' && activeGroup && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+            <div className="flex items-center justify-between">
+              <h1 className="text-4xl font-black text-stone-900">Chairman Dashboard</h1>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => { navigator.clipboard.writeText(activeGroup.id); showToast("Code copied!"); }}
+                  className="bg-white border border-stone-200 text-stone-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-stone-50 transition-colors shadow-sm"
+                >
+                  <Copy size={16} /> Code: {activeGroup.id}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              
+              {/* Stats Card */}
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200 col-span-3 md:col-span-1 h-fit">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-xl font-black text-stone-900">{activeGroup.name}</h3>
+                    <p className="text-stone-500 font-medium">Status: <span className={`font-bold ${activeGroup.status === 'ACTIVE' ? 'text-green-600' : 'text-amber-600'}`}>{activeGroup.status}</span></p>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                    <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Members</p>
+                    <p className="font-black text-stone-900 text-2xl">{activeGroup.members.length} <span className="text-base font-medium text-stone-500">/ {activeGroup.minMembers} (Min)</span></p>
+                  </div>
+                  <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                    <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Contribution</p>
+                    <p className="font-black text-stone-900 text-2xl">{activeGroup.amount} AVAX <span className="text-base font-medium text-stone-500 block">Every {activeGroup.cycle} Days</span></p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleStartCycle}
+                  disabled={activeGroup.status !== 'ACTIVE'}
+                  className="w-full mt-6 bg-stone-900 hover:bg-stone-800 text-white py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Start Cycle
+                </button>
+                {activeGroup.status !== 'ACTIVE' && (
+                  <p className="text-center text-stone-500 text-sm mt-2 font-medium">Need {activeGroup.minMembers - activeGroup.members.length} more members to start.</p>
+                )}
+              </div>
+
+              {/* Requests & Members Area */}
+              <div className="col-span-3 md:col-span-2 space-y-6">
+                
+                {/* Pending Requests */}
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Bell className="text-amber-600" size={24} />
+                    <h3 className="text-xl font-black text-stone-900">Join Requests</h3>
+                    {activeGroup.requests.length > 0 && (
+                      <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-black">{activeGroup.requests.length}</span>
+                    )}
+                  </div>
+                  
+                  {activeGroup.requests.length === 0 ? (
+                    <div className="text-center py-8 bg-stone-50 rounded-xl border border-dashed border-stone-200">
+                      <p className="text-stone-500 font-medium">No pending requests right now.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {activeGroup.requests.map(req => (
+                        <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-stone-50 border border-stone-100 rounded-xl gap-4">
+                          <div>
+                            <p className="font-bold text-stone-900 text-lg">{req.name}</p>
+                            <p className="text-stone-500 text-sm font-mono">{req.userWallet.substring(0, 6)}...{req.userWallet.substring(req.userWallet.length - 4)}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleApproveRequest(req.id, true)} className="bg-green-100 hover:bg-green-200 text-green-700 p-2 rounded-lg transition-colors font-bold flex items-center gap-1 px-4">
+                              <Check size={18} /> Accept
+                            </button>
+                            <button onClick={() => handleApproveRequest(req.id, false)} className="bg-red-100 hover:bg-red-200 text-red-700 p-2 rounded-lg transition-colors font-bold flex items-center gap-1 px-4">
+                              <XCircle size={18} /> Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Manage Members */}
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Users className="text-amber-600" size={24} />
+                    <h3 className="text-xl font-black text-stone-900">Active Members</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {activeGroup.members.map((m, idx) => (
+                      <div key={idx} className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-100 rounded-xl">
+                        <div className="w-10 h-10 bg-stone-800 rounded-full flex items-center justify-center text-white font-bold">
+                          {m.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-stone-900">{m.name} {idx === 0 && <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full ml-1">Admin</span>}</p>
+                          <p className="text-stone-500 text-xs font-mono">{m.walletAddress.substring(0, 6)}...{m.walletAddress.substring(m.walletAddress.length - 4)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW: MEMBER PENDING REQUEST */}
+        {currentView === 'pending' && activeGroup && (
+          <div className="flex flex-col items-center justify-center pt-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-white p-12 rounded-3xl shadow-xl border border-stone-200 max-w-lg w-full text-center">
+              <div className="w-24 h-24 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Loader2 size={48} className="animate-spin" />
+              </div>
+              <h2 className="text-3xl font-black text-stone-900 mb-4">Request Pending</h2>
+              <p className="text-stone-600 text-lg leading-relaxed mb-8">
+                Your request to join <span className="font-bold text-stone-900">{activeGroup.name}</span> has been sent to the Chairman. Please wait for approval.
+              </p>
+              
+              <div className="bg-stone-50 p-4 rounded-xl border border-stone-100 text-left space-y-2">
+                <p className="text-stone-500 text-sm font-bold uppercase tracking-widest">Group Info</p>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-stone-900">Required Contribution:</span>
+                  <span className="font-mono text-stone-700">{activeGroup.amount} AVAX</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-stone-900">Status:</span>
+                  <span className="font-mono text-amber-600 font-bold">Awaiting Approval</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
 
+      {/* MODALS */}
+      
       {/* CREATE GROUP MODAL */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
-            {createSuccess ? (
-              <div className="p-12 flex flex-col items-center justify-center text-center animate-in zoom-in-95 duration-300 h-96">
-                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-                  <CheckCircle2 size={40} />
+            <div className="flex items-center justify-between p-6 border-b border-stone-100">
+              <h2 className="text-2xl font-black text-stone-900">Create New Chama</h2>
+              <button onClick={() => setIsCreateModalOpen(false)} className="p-2 text-stone-400 hover:text-stone-900 transition-colors rounded-full hover:bg-stone-100">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto custom-scrollbar">
+              <form id="create-group-form" onSubmit={handleCreateSubmit} className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <label className="text-sm font-bold text-stone-700">Group Name</label>
+                    <input required value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-medium" placeholder="e.g. Nairobi Savers" />
+                  </div>
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <label className="text-sm font-bold text-stone-700">Group Code *</label>
+                    <input required value={createForm.code} onChange={e => setCreateForm({...createForm, code: e.target.value.toUpperCase().trim()})} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-mono font-bold uppercase" placeholder="e.g. NAIROBI24" />
+                  </div>
                 </div>
-                <h2 className="text-3xl font-black text-stone-900 mb-2">Group Created!</h2>
-                <p className="text-stone-500 text-lg">Your chama is ready to go.</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between p-6 border-b border-stone-100">
-                  <h2 className="text-2xl font-black text-stone-900">Create New Chama</h2>
-                  <button onClick={() => setIsCreateModalOpen(false)} className="p-2 text-stone-400 hover:text-stone-900 transition-colors rounded-full hover:bg-stone-100">
-                    <X size={20} />
-                  </button>
-                </div>
-                
-                <div className="p-6 overflow-y-auto custom-scrollbar">
-                  <form id="create-group-form" onSubmit={handleCreateSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 col-span-2 sm:col-span-1">
-                        <label className="text-sm font-bold text-stone-700">Group Name</label>
-                        <input required value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-medium" placeholder="e.g. Nairobi Savers" />
-                      </div>
-                      <div className="space-y-2 col-span-2 sm:col-span-1">
-                        <label className="text-sm font-bold text-stone-700">Group Code <span className="text-amber-600">*</span></label>
-                        <input required value={createForm.code} onChange={e => setCreateForm({...createForm, code: e.target.value.toUpperCase().trim()})} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-mono font-bold uppercase" placeholder="e.g. NAIROBI24" />
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 col-span-2 sm:col-span-1">
-                        <label className="text-sm font-bold text-stone-700">Chairman Name</label>
-                        <input required value={createForm.chairmanName} onChange={e => setCreateForm({...createForm, chairmanName: e.target.value})} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-medium" placeholder="Your name" />
-                      </div>
-                      <div className="space-y-2 col-span-2 sm:col-span-1">
-                        <label className="text-sm font-bold text-stone-700">Phone Number</label>
-                        <input required value={createForm.chairmanPhone} onChange={e => setCreateForm({...createForm, chairmanPhone: e.target.value})} type="tel" className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-medium" placeholder="+254 700 000 000" />
-                      </div>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <label className="text-sm font-bold text-stone-700">Chairman Name</label>
+                    <input required value={createForm.chairmanName} onChange={e => setCreateForm({...createForm, chairmanName: e.target.value})} className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-medium" placeholder="Your name" />
+                  </div>
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <label className="text-sm font-bold text-stone-700">Phone Number</label>
+                    <input required value={createForm.chairmanPhone} onChange={e => setCreateForm({...createForm, chairmanPhone: e.target.value})} type="tel" className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-medium" placeholder="+254 700 000 000" />
+                  </div>
+                </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2 col-span-3 sm:col-span-1">
-                        <label className="text-sm font-bold text-stone-700">Amount (AVAX)</label>
-                        <input required value={createForm.amount} onChange={e => setCreateForm({...createForm, amount: e.target.value})} type="number" min="0" step="0.1" className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-bold" placeholder="10.0" />
-                      </div>
-                      <div className="space-y-2 col-span-3 sm:col-span-1">
-                        <label className="text-sm font-bold text-stone-700">Cycle</label>
-                        <div className="relative flex items-center w-full bg-stone-50 border border-stone-200 rounded-xl focus-within:ring-2 focus-within:ring-amber-500/50 focus-within:border-amber-500 transition-all overflow-hidden">
-                          <input 
-                            required 
-                            value={createForm.cycle} 
-                            onChange={e => setCreateForm({...createForm, cycle: e.target.value})} 
-                            type="number" 
-                            min="1" 
-                            className="w-full bg-transparent px-4 py-3 focus:outline-none text-stone-900 font-bold" 
-                            placeholder="7" 
-                          />
-                          <span className="pr-4 text-stone-500 font-medium pointer-events-none">Days</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2 col-span-3 sm:col-span-1">
-                        <label className="text-sm font-bold text-stone-700">Min Members</label>
-                        <input required value={createForm.minMembers} onChange={e => setCreateForm({...createForm, minMembers: e.target.value})} type="number" min="2" max="20" className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-bold" placeholder="5" />
-                      </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2 col-span-3 sm:col-span-1">
+                    <label className="text-sm font-bold text-stone-700">Amount (AVAX)</label>
+                    <input required value={createForm.amount} onChange={e => setCreateForm({...createForm, amount: e.target.value})} type="number" min="0" step="0.1" className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-bold" placeholder="10.0" />
+                  </div>
+                  <div className="space-y-2 col-span-3 sm:col-span-1">
+                    <label className="text-sm font-bold text-stone-700">Cycle</label>
+                    <div className="relative flex items-center w-full bg-stone-50 border border-stone-200 rounded-xl focus-within:ring-2 focus-within:ring-amber-500/50 focus-within:border-amber-500 transition-all overflow-hidden">
+                      <input 
+                        required 
+                        value={createForm.cycle} 
+                        onChange={e => setCreateForm({...createForm, cycle: e.target.value})} 
+                        type="number" 
+                        min="1" 
+                        className="w-full bg-transparent px-4 py-3 focus:outline-none text-stone-900 font-bold" 
+                        placeholder="7" 
+                      />
+                      <span className="pr-4 text-stone-500 font-medium pointer-events-none">Days</span>
                     </div>
-                  </form>
+                  </div>
+                  <div className="space-y-2 col-span-3 sm:col-span-1">
+                    <label className="text-sm font-bold text-stone-700">Min Members</label>
+                    <input required value={createForm.minMembers} onChange={e => setCreateForm({...createForm, minMembers: e.target.value})} type="number" min="2" max="20" className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-stone-900 font-bold" placeholder="3" />
+                  </div>
                 </div>
-                
-                <div className="p-6 border-t border-stone-100 bg-stone-50">
-                  <button 
-                    form="create-group-form" 
-                    type="submit" 
-                    disabled={isCreating}
-                    className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg shadow-amber-600/20 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-70 flex items-center justify-center gap-2"
-                  >
-                    {isCreating ? <><Loader2 className="animate-spin" size={20} /> Creating...</> : "Create Group"}
-                  </button>
-                </div>
-              </>
-            )}
+              </form>
+            </div>
+            
+            <div className="p-6 border-t border-stone-100 bg-stone-50">
+              <button 
+                form="create-group-form" 
+                type="submit" 
+                disabled={isCreating}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg shadow-amber-600/20 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {isCreating ? <><Loader2 className="animate-spin" size={20} /> Creating...</> : "Create Group"}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* JOIN GROUP MODAL */}
+      {/* JOIN REQUEST MODAL */}
       {isJoinModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-stone-100">
-              <h2 className="text-2xl font-black text-stone-900">Join a Chama</h2>
+              <h2 className="text-2xl font-black text-stone-900">Request to Join</h2>
               <button onClick={() => {setIsJoinModalOpen(false); setJoinStep(1); setFoundGroup(null);}} className="p-2 text-stone-400 hover:text-stone-900 transition-colors rounded-full hover:bg-stone-100">
                 <X size={20} />
               </button>
             </div>
             
             <div className="p-6">
-              <form onSubmit={joinStep === 1 ? (e) => { e.preventDefault(); if (foundGroup) setJoinStep(2); } : handleJoinSubmit} className="space-y-6">
+              <form onSubmit={joinStep === 1 ? (e) => { e.preventDefault(); if (foundGroup) setJoinStep(2); } : handleJoinRequest} className="space-y-6">
                 
                 {joinStep === 1 ? (
                   <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -537,7 +694,7 @@ export default function Home() {
                       disabled={isJoining}
                       className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg shadow-amber-600/20 hover:shadow-xl hover:-translate-y-0.5 mt-4 flex items-center justify-center gap-2"
                     >
-                      {isJoining ? <><Loader2 className="animate-spin" size={20} /> Joining...</> : "Join Group"}
+                      {isJoining ? <><Loader2 className="animate-spin" size={20} /> Sending Request...</> : "Send Request"}
                     </button>
                   </div>
                 )}
