@@ -61,7 +61,8 @@ export const CHAINCHAMA_ABI = [
       { "internalType": "uint256", "name": "contributionAmount", "type": "uint256" },
       { "internalType": "uint256", "name": "cycle", "type": "uint256" },
       { "internalType": "bool", "name": "isActive", "type": "bool" },
-      { "internalType": "uint256", "name": "memberCount", "type": "uint256" }
+      { "internalType": "uint256", "name": "memberCount", "type": "uint256" },
+      { "internalType": "uint256", "name": "payoutIndex", "type": "uint256" }
     ],
     "stateMutability": "view",
     "type": "function"
@@ -89,6 +90,27 @@ export const CHAINCHAMA_ABI = [
     "name": "pendingRequests",
     "outputs": [
       { "internalType": "bool", "name": "", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "_code", "type": "string" }
+    ],
+    "name": "startCycle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "", "type": "string" },
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "name": "groupMembersList",
+    "outputs": [
+      { "internalType": "address", "name": "", "type": "address" }
     ],
     "stateMutability": "view",
     "type": "function"

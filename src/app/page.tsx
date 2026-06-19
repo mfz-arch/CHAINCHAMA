@@ -347,9 +347,33 @@ export default function Home() {
     }
   };
 
-  const handleStartCycle = () => {
-    showToast("Cycle Started Successfully!");
-    // Logic for smart contract cycle start would go here
+  const handleStartCycle = async () => {
+    if (!activeGroup || !walletAddress) return;
+    try {
+      if (!CHAINCHAMA_ADDRESS.includes("YOUR_CONTRACT_ADDRESS")) {
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI, signer);
+        
+        const tx = await contract.startCycle(activeGroup.id);
+        await tx.wait();
+        
+        showToast("AVAX successfully transferred to the next member!", "success");
+        
+        // Optimistically update local UI state to show empty funds
+        setGroups(prev => prev.map(g => {
+          if (g.id === activeGroup.id) {
+            return { ...g, totalFunds: 0 };
+          }
+          return g;
+        }));
+      } else {
+        showToast("Cycle Started Successfully!");
+      }
+    } catch (e: any) {
+      console.error("Payout failed:", e);
+      showToast(e?.message || "Payout failed. Make sure group has funds.", "error");
+    }
   };
 
   const handleContribute = async () => {
@@ -604,7 +628,7 @@ export default function Home() {
                   </div>
                   <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
                     <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Contribution</p>
-                    <p className="font-black text-stone-900 text-2xl">{activeGroup.amount} AVAX <span className="text-base font-medium text-stone-500 block">Every {activeGroup.cycle} Days</span></p>
+                    <p className="font-black text-stone-900 text-2xl">{activeGroup.amount} AVAX <span className="text-base font-medium text-stone-500 block">Every {activeGroup.cycle} Minutes</span></p>
                   </div>
                 </div>
 
@@ -711,7 +735,7 @@ export default function Home() {
                   </div>
                   <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
                     <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Contribution</p>
-                    <p className="font-black text-stone-900 text-2xl">{activeGroup.amount} AVAX <span className="text-base font-medium text-stone-500 block">Every {activeGroup.cycle} Days</span></p>
+                    <p className="font-black text-stone-900 text-2xl">{activeGroup.amount} AVAX <span className="text-base font-medium text-stone-500 block">Every {activeGroup.cycle} Minutes</span></p>
                   </div>
                 </div>
 
@@ -844,7 +868,7 @@ export default function Home() {
                         className="w-full bg-transparent px-4 py-3 focus:outline-none text-stone-900 font-bold" 
                         placeholder="7" 
                       />
-                      <span className="pr-4 text-stone-500 font-medium pointer-events-none">Days</span>
+                      <span className="pr-4 text-stone-500 font-medium pointer-events-none">Minutes</span>
                     </div>
                   </div>
                   <div className="space-y-2 col-span-3 sm:col-span-1">

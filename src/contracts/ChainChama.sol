@@ -16,12 +16,17 @@ contract ChainChama {
         uint minMembers;
         uint maxMembers;
         uint contributionAmount;
-        uint cycle; // cycle in days
+        uint cycle; // cycle in minutes for demo
         bool isActive;
         uint memberCount;
+        uint payoutIndex; // Tracks whose turn it is to receive funds
     }
 
     mapping(string => Group) public groups;
+    
+    // groupCode => array of approved member addresses (for round robin payouts)
+    mapping(string => address[]) public groupMembersList;
+
     // groupCode => memberAddress => MemberData
     mapping(string => mapping(address => MemberData)) public members;
     
@@ -50,7 +55,8 @@ contract ChainChama {
             contributionAmount: _contributionAmount,
             cycle: _cycle,
             isActive: false,
-            memberCount: 1
+            memberCount: 1,
+            payoutIndex: 0
         });
 
         // Admin is automatically approved and added, but hasn't contributed yet
@@ -60,6 +66,9 @@ contract ChainChama {
             isApproved: true,
             hasContributed: false
         });
+        
+        // Add admin to the round robin list
+        groupMembersList[_code].push(msg.sender);
     }
 
     function requestJoin(string memory _code, string memory _name, string memory _phone) public {
@@ -85,6 +94,8 @@ contract ChainChama {
         members[_code][_member].isApproved = true;
         groups[_code].memberCount++;
         
+        groupMembersList[_code].push(_member); // Add to payout list
+        
         if(groups[_code].memberCount >= groups[_code].minMembers) {
             groups[_code].isActive = true;
         }
@@ -98,4 +109,29 @@ contract ChainChama {
         members[_code][msg.sender].hasContributed = true;
         groups[_code].totalFunds += msg.value;
     }
+
+    // New Payout function for the Hackathon Demo
+    function startCycle(string memory _code) public {
+        require(msg.sender == groups[_code].admin, "Only Chairman can start cycle");
+        require(groups[_code].totalFunds > 0, "No funds to payout");
+
+        // Identify the next recipient
+        address payable recipient = payable(groupMembersList[_code][groups[_code].payoutIndex]);
+        uint payoutAmount = groups[_code].totalFunds;
+        
+        // Zero out the funds
+        groups[_code].totalFunds = 0;
+        
+        // Increment the payout index (wrap around back to 0 if at the end)
+        groups[_code].payoutIndex = (groups[_code].payoutIndex + 1) % groupMembersList[_code].length;
+        
+        // Reset everyone's contribution status for the next cycle
+        for(uint i = 0; i < groupMembersList[_code].length; i++) {
+            members[_code][groupMembersList[_code][i]].hasContributed = false;
+        }
+
+        // Transfer the funds to the recipient
+        recipient.transfer(payoutAmount);
+    }
 }
+
