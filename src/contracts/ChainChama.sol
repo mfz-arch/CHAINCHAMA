@@ -131,7 +131,8 @@ contract ChainChama {
         }
 
         // Transfer the funds to the recipient
-        recipient.transfer(payoutAmount);
+        (bool success, ) = recipient.call{value: payoutAmount}("");
+        require(success, "Transfer failed");
     }
 }
 
