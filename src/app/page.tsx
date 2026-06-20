@@ -410,7 +410,7 @@ export default function Home() {
                 : m
             );
             // Also increment the visual totalFunds pot for the demo
-            return { ...g, members: updatedMembers, totalFunds: g.totalFunds + g.amount };
+            return { ...g, members: updatedMembers, totalFunds: (g.totalFunds || 0) + g.amount };
           }
           return g;
         }));
