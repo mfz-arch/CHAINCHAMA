@@ -226,6 +226,7 @@ export default function Home() {
             minMembers: Number(g.minMembers),
             maxMembers: Number(g.maxMembers),
             status: g.isActive ? 'ACTIVE' : 'PENDING', // Map bool to literal type
+            totalFunds: Number(ethers.formatEther(g.totalFunds)),
             members: [],
             requests: [] 
           };
@@ -361,7 +362,8 @@ export default function Home() {
         const tx = await contract.startCycle(activeGroup.id);
         await tx.wait();
         
-        showToast("AVAX successfully transferred to the next member!", "success");
+        const nextMemberName = activeGroup.members.length > 0 ? activeGroup.members[0].name : "the next member";
+        showToast(`Contribution successfully sent to ${nextMemberName}`, "success");
         
         // Log the recent transaction
         setRecentPayouts(prev => [{
