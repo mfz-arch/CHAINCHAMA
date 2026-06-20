@@ -16,6 +16,7 @@ interface Member {
   phone: string;
   walletAddress: string;
   joinedAt: number;
+  hasContributed?: boolean;
 }
 
 interface JoinRequest {
@@ -369,10 +370,11 @@ export default function Home() {
           txHash: tx.hash
         }, ...prev]);
 
-        // Optimistically update local UI state to show empty funds
+        // Optimistically update local UI state to show empty funds and reset member payments
         setGroups(prev => prev.map(g => {
           if (g.id === activeGroup.id) {
-            return { ...g, totalFunds: 0 };
+            const resetMembers = g.members.map(m => ({ ...m, hasContributed: false }));
+            return { ...g, totalFunds: 0, members: resetMembers };
           }
           return g;
         }));
@@ -397,6 +399,20 @@ export default function Home() {
         });
         await tx.wait();
         showToast("Contribution successful on-chain!");
+        
+        // Optimistically update local UI to show this member paid
+        setGroups(prev => prev.map(g => {
+          if (g.id === activeGroup.id) {
+            const updatedMembers = g.members.map(m => 
+              m.walletAddress.toLowerCase() === walletAddress.toLowerCase() 
+                ? { ...m, hasContributed: true } 
+                : m
+            );
+            // Also increment the visual totalFunds pot for the demo
+            return { ...g, members: updatedMembers, totalFunds: g.totalFunds + g.amount };
+          }
+          return g;
+        }));
       } else {
         await new Promise(r => setTimeout(r, 1500));
         showToast("Mock contribution successful!");
@@ -784,17 +800,26 @@ export default function Home() {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {activeGroup.members.map((m, idx) => (
-                      <div key={idx} className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-100 rounded-xl">
-                        <div className="w-10 h-10 bg-stone-800 rounded-full flex items-center justify-center text-white font-bold">
-                          {m.name.charAt(0)}
+                      <div key={idx} className="flex items-center gap-3 p-3 bg-stone-50 border border-stone-100 rounded-xl justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${m.hasContributed ? 'bg-green-500' : 'bg-stone-800'}`}>
+                            {m.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-stone-900">
+                              {m.name} 
+                              {m.walletAddress.toLowerCase() === activeGroup.chairmanWallet.toLowerCase() && <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full ml-1">Admin</span>}
+                              {m.walletAddress.toLowerCase() === walletAddress?.toLowerCase() && <span className="text-xs bg-stone-200 text-stone-800 px-2 py-0.5 rounded-full ml-1">You</span>}
+                            </p>
+                            <p className="text-stone-500 text-xs font-mono">{m.walletAddress.substring(0, 6)}...{m.walletAddress.substring(m.walletAddress.length - 4)}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-stone-900">
-                            {m.name} 
-                            {m.walletAddress.toLowerCase() === activeGroup.chairmanWallet.toLowerCase() && <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full ml-1">Admin</span>}
-                            {m.walletAddress.toLowerCase() === walletAddress?.toLowerCase() && <span className="text-xs bg-stone-200 text-stone-800 px-2 py-0.5 rounded-full ml-1">You</span>}
-                          </p>
-                          <p className="text-stone-500 text-xs font-mono">{m.walletAddress.substring(0, 6)}...{m.walletAddress.substring(m.walletAddress.length - 4)}</p>
+                        <div className="text-right">
+                          {m.hasContributed ? (
+                            <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-lg">Paid</span>
+                          ) : (
+                            <span className="text-xs font-bold bg-stone-200 text-stone-500 px-2 py-1 rounded-lg">Pending</span>
+                          )}
                         </div>
                       </div>
                     ))}
