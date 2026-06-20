@@ -373,6 +373,8 @@ export default function Home() {
           time: new Date().toLocaleTimeString(),
           amount: activeGroup.totalFunds || 0,
           type: `Cycle Payout to ${nextMemberName}`,
+          receiverName: nextMemberName,
+          receiverWallet: activeGroup.members.length > currentPayoutIndex ? activeGroup.members[currentPayoutIndex].walletAddress : null,
           txHash: tx.hash
         }, ...prev]);
 
@@ -765,6 +767,62 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Recent Activity & Payouts */}
+                <div className="bg-white p-6 rounded-3xl shadow-sm border border-stone-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </div>
+                      <h3 className="text-xl font-black text-stone-900">Recent Activity</h3>
+                    </div>
+                    <a 
+                      href={`https://testnet.snowtrace.io/address/${CHAINCHAMA_ADDRESS}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 py-1.5 px-3 rounded-full transition-colors flex items-center gap-1"
+                    >
+                      Verify on Snowtrace <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                    </a>
+                  </div>
+                  
+                  {recentPayouts.length === 0 ? (
+                    <div className="text-center py-6 bg-stone-50 rounded-xl border border-stone-100 border-dashed">
+                      <p className="text-stone-500 font-medium text-sm">No recent payouts yet.</p>
+                      <p className="text-stone-400 text-xs mt-1">Start a cycle to see blockchain activity here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recentPayouts.map((payout, idx) => {
+                        const isYou = payout.receiverWallet && walletAddress && payout.receiverWallet.toLowerCase() === walletAddress.toLowerCase();
+                        return (
+                        <div key={idx} className="flex items-center justify-between p-4 bg-stone-50 border border-stone-100 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                            </div>
+                            <div>
+                              <p className="font-bold text-stone-900">{isYou ? 'Cycle Payout to YOU' : payout.type}</p>
+                              <p className="text-stone-500 text-xs">{payout.time}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-green-600">+{payout.amount} AVAX</p>
+                            <a 
+                              href={`https://testnet.snowtrace.io/tx/${payout.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-stone-400 hover:text-amber-600 text-xs font-medium underline transition-colors"
+                            >
+                              View tx
+                            </a>
+                          </div>
+                        </div>
+                      )})}
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
           </div>
@@ -875,14 +933,16 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {recentPayouts.map((payout, idx) => (
+                      {recentPayouts.map((payout, idx) => {
+                        const isYou = payout.receiverWallet && walletAddress && payout.receiverWallet.toLowerCase() === walletAddress.toLowerCase();
+                        return (
                         <div key={idx} className="flex items-center justify-between p-4 bg-stone-50 border border-stone-100 rounded-xl">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600">
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
                             </div>
                             <div>
-                              <p className="font-bold text-stone-900">{payout.type}</p>
+                              <p className="font-bold text-stone-900">{isYou ? 'Cycle Payout to YOU' : payout.type}</p>
                               <p className="text-stone-500 text-xs">{payout.time}</p>
                             </div>
                           </div>
@@ -898,7 +958,7 @@ export default function Home() {
                             </a>
                           </div>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   )}
                 </div>
