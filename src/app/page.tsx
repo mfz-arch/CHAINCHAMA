@@ -43,6 +43,7 @@ interface Group {
   members: Member[];
   requests: JoinRequest[];
   totalFunds?: number;
+  payoutIndex?: number;
 }
 
 type Role = 'chairman' | 'member' | null;
@@ -227,6 +228,7 @@ export default function Home() {
             maxMembers: Number(g.maxMembers),
             status: g.isActive ? 'ACTIVE' : 'PENDING', // Map bool to literal type
             totalFunds: Number(ethers.formatEther(g.totalFunds)),
+            payoutIndex: Number(g.payoutIndex),
             members: [],
             requests: [] 
           };
@@ -362,7 +364,8 @@ export default function Home() {
         const tx = await contract.startCycle(activeGroup.id);
         await tx.wait();
         
-        const nextMemberName = activeGroup.members.length > 0 ? activeGroup.members[0].name : "the next member";
+        const currentPayoutIndex = activeGroup.payoutIndex || 0;
+        const nextMemberName = activeGroup.members.length > currentPayoutIndex ? activeGroup.members[currentPayoutIndex].name : "the next member";
         showToast(`Contribution successfully sent to ${nextMemberName}`, "success");
         
         // Log the recent transaction
@@ -373,11 +376,11 @@ export default function Home() {
           txHash: tx.hash
         }, ...prev]);
 
-        // Optimistically update local UI state to show empty funds and reset member payments
+        // Optimistically update local UI state to show empty funds, reset member payments, and rotate the payout index
         setGroups(prev => prev.map(g => {
           if (g.id === activeGroup.id) {
             const resetMembers = g.members.map(m => ({ ...m, hasContributed: false }));
-            return { ...g, totalFunds: 0, members: resetMembers };
+            return { ...g, totalFunds: 0, members: resetMembers, payoutIndex: (currentPayoutIndex + 1) % g.members.length };
           }
           return g;
         }));
@@ -431,7 +434,7 @@ export default function Home() {
   const displayMembers = activeGroup ? activeGroup.members.map((m, i) => ({
     name: m.name,
     walletAddress: m.walletAddress,
-    status: i === 0 ? 'Next' : 'Waiting'
+    status: i === (activeGroup.payoutIndex || 0) ? 'Next' : 'Waiting'
   })) : [
     { name: "Amani", walletAddress: "0x0000000000000000000000000000000000000000", status: "Received" },
     { name: "Baraka", walletAddress: "0x0000000000000000000000000000000000000000", status: "Next" },
