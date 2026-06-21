@@ -1,0 +1,13 @@
+{
+  "name": "chainchama-bot",
+  "version": "1.0.0",
+  "description": "Admin Automation Bot for ChainChama",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1"
+  }
+}

@@ -20,6 +20,7 @@ contract ChainChama {
         bool isActive;
         uint memberCount;
         uint payoutIndex; // Tracks whose turn it is to receive funds
+        uint lastCycleStartTime; // On-chain countdown tracker
     }
 
     mapping(string => Group) public groups;
@@ -32,6 +33,13 @@ contract ChainChama {
     
     // groupCode => memberAddress => bool
     mapping(string => mapping(address => bool)) public pendingRequests;
+
+    // Tracks which groups a user belongs to
+    mapping(address => string[]) public userGroups;
+
+    function getUserGroups(address _user) public view returns (string[] memory) {
+        return userGroups[_user];
+    }
 
     function createGroup(
         string memory _code, 
@@ -56,7 +64,8 @@ contract ChainChama {
             cycle: _cycle,
             isActive: false,
             memberCount: 1,
-            payoutIndex: 0
+            payoutIndex: 0,
+            lastCycleStartTime: block.timestamp
         });
 
         // Admin is automatically approved and added, but hasn't contributed yet
@@ -69,6 +78,8 @@ contract ChainChama {
         
         // Add admin to the round robin list
         groupMembersList[_code].push(msg.sender);
+        // Track this group for the admin
+        userGroups[msg.sender].push(_code);
     }
 
     function requestJoin(string memory _code, string memory _name, string memory _phone) public {
@@ -95,6 +106,7 @@ contract ChainChama {
         groups[_code].memberCount++;
         
         groupMembersList[_code].push(_member); // Add to payout list
+        userGroups[_member].push(_code);       // Track this group for the user
         
         if(groups[_code].memberCount >= groups[_code].minMembers) {
             groups[_code].isActive = true;
@@ -110,10 +122,11 @@ contract ChainChama {
         groups[_code].totalFunds += msg.value;
     }
 
-    // New Payout function for the Hackathon Demo
     function startCycle(string memory _code) public {
-        require(msg.sender == groups[_code].admin, "Only Chairman can start cycle");
         require(groups[_code].totalFunds > 0, "No funds to payout");
+        
+        // Ensure the time limit has passed before allowing payout
+        require(block.timestamp >= groups[_code].lastCycleStartTime + (groups[_code].cycle * 1 minutes), "Cycle time not reached");
 
         // Identify the next recipient
         address payable recipient = payable(groupMembersList[_code][groups[_code].payoutIndex]);
@@ -130,9 +143,11 @@ contract ChainChama {
             members[_code][groupMembersList[_code][i]].hasContributed = false;
         }
 
+        // Reset the timer for the next cycle
+        groups[_code].lastCycleStartTime = block.timestamp;
+
         // Transfer the funds to the recipient
         (bool success, ) = recipient.call{value: payoutAmount}("");
         require(success, "Transfer failed");
     }
 }
-
