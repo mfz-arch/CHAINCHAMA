@@ -55,7 +55,21 @@ export default function Home() {
   const [isConnecting, setIsConnecting] = useState(false);
 
   // App & Global State
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<Group[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('chainchama_groups');
+      if (saved) {
+        try { return JSON.parse(saved); } catch(e){}
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (groups.length > 0) {
+      localStorage.setItem('chainchama_groups', JSON.stringify(groups));
+    }
+  }, [groups]);
   const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
   const [activeGroupCode, setActiveGroupCode] = useState<string | null>(null);
   const [myGroups, setMyGroups] = useState<{id: string, name: string}[]>([]);
