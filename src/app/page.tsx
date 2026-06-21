@@ -196,11 +196,12 @@ export default function Home() {
           const recipient = activeGroup.members[currentIndex % activeGroup.members.length];
           
           setRecentPayouts(prev => [{
-            recipientName: recipient?.name || "Member",
-            recipientWallet: recipient?.walletAddress || "0x...",
+            time: new Date().toLocaleTimeString(),
             amount: activeGroup.amount * activeGroup.members.length,
-            txHash: "0xAutomatedPayout...",
-            timestamp: Date.now()
+            type: `Cycle Payout to ${recipient?.name || "Member"}`,
+            receiverName: recipient?.name || "Member",
+            receiverWallet: recipient?.walletAddress || "0x...",
+            txHash: "0xAutomatedPayout..."
           }, ...prev]);
           
           setGroups(prev => prev.map(grp => {
