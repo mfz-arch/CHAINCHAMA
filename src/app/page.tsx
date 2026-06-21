@@ -44,6 +44,7 @@ interface Group {
   requests: JoinRequest[];
   totalFunds?: number;
   payoutIndex?: number;
+  lastCycleStartTime?: number;
 }
 
 type Role = 'chairman' | 'member' | null;
@@ -57,6 +58,8 @@ export default function Home() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
   const [activeGroupCode, setActiveGroupCode] = useState<string | null>(null);
+  const [myGroups, setMyGroups] = useState<{id: string, name: string}[]>([]);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   
   // Navigation & Roles
   const [currentUserRole, setCurrentUserRole] = useState<Role>(null);
@@ -84,6 +87,7 @@ export default function Home() {
     setCurrentView('home');
     setCurrentUserRole(null);
     setActiveGroupCode(null);
+    setMyGroups([]);
     showToast("Wallet disconnected");
   };
 
@@ -109,6 +113,59 @@ export default function Home() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const fetchMyGroups = async () => {
+      if (walletAddress && typeof window !== 'undefined' && !CHAINCHAMA_ADDRESS.includes("YOUR_CONTRACT_ADDRESS")) {
+        try {
+          const provider = new ethers.BrowserProvider((window as any).ethereum);
+          const contract = new ethers.Contract(CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI, provider);
+          
+          const groupCodes = await contract.getUserGroups(walletAddress);
+          const groupsData = [];
+          
+          for (let code of groupCodes) {
+            const g = await contract.groups(code);
+            groupsData.push({ id: code, name: g.name });
+          }
+          
+          setMyGroups(groupsData);
+        } catch (error) {
+          console.error("Error fetching user groups:", error);
+        }
+      } else {
+        setMyGroups([]);
+      }
+    };
+    
+    fetchMyGroups();
+  }, [walletAddress]);
+
+  // Global Countdown Logic
+  useEffect(() => {
+    if (!activeGroup || !activeGroup.lastCycleStartTime) return;
+    
+    // Initial calculate
+    const calculateTimeLeft = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const target = activeGroup.lastCycleStartTime! + (Number(activeGroup.cycle) * 60);
+      return Math.max(0, target - now);
+    };
+    
+    setTimeLeft(calculateTimeLeft());
+    
+    const interval = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [activeGroup?.lastCycleStartTime, activeGroup?.cycle]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -229,6 +286,7 @@ export default function Home() {
             status: g.isActive ? 'ACTIVE' : 'PENDING', // Map bool to literal type
             totalFunds: Number(ethers.formatEther(g.totalFunds)),
             payoutIndex: Number(g.payoutIndex),
+            lastCycleStartTime: Number(g.lastCycleStartTime),
             members: [],
             requests: [] 
           };
@@ -583,6 +641,28 @@ export default function Home() {
                   Create Group
                 </button>
               </div>
+
+              {/* MY GROUPS SECTION */}
+              {walletAddress && myGroups.length > 0 && (
+                <div className="pt-8 border-t border-stone-200 mt-8">
+                  <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">My Groups</h3>
+                  <div className="flex flex-col gap-3">
+                    {myGroups.map(mg => (
+                      <button
+                        key={mg.id}
+                        onClick={() => handleCodeCheck(mg.id)}
+                        className="flex items-center justify-between p-4 bg-white border border-stone-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all text-left group"
+                      >
+                        <div>
+                          <p className="font-bold text-stone-900 group-hover:text-amber-600 transition-colors">{mg.name}</p>
+                          <p className="text-xs text-stone-500 font-mono">Code: {mg.id}</p>
+                        </div>
+                        <ArrowRightLeft className="text-stone-300 group-hover:text-amber-500 transition-colors" size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right: Circular Rotation UI */}
@@ -847,6 +927,14 @@ export default function Home() {
                 </div>
                 
                 <div className="space-y-4">
+                  <div className="bg-stone-900 text-white p-4 rounded-xl border border-stone-800 shadow-inner flex flex-col items-center justify-center">
+                    <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Time Left</p>
+                    <p className={`font-black text-4xl font-mono ${timeLeft === 0 ? 'text-amber-400 animate-pulse' : 'text-white'}`}>
+                      {formatTime(timeLeft)}
+                    </p>
+                    <p className="text-stone-500 text-xs mt-1">Cycle Duration: {activeGroup.cycle} min</p>
+                  </div>
+
                   <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
                     <p className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-1">Members</p>
                     <p className="font-black text-stone-900 text-2xl">{activeGroup.members.length} <span className="text-base font-medium text-stone-500">/ {activeGroup.minMembers} (Min)</span></p>
