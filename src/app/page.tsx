@@ -260,6 +260,54 @@ export default function Home() {
     }
   };
 
+  const handleEnterGroup = async (code: string) => {
+    const trimmedCode = code.trim();
+    setActiveGroupCode(trimmedCode);
+    
+    let group = groups.find(g => g.id === trimmedCode);
+    
+    if (!group && !CHAINCHAMA_ADDRESS.includes("YOUR_CONTRACT_ADDRESS") && typeof window !== 'undefined') {
+      try {
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const contract = new ethers.Contract(CHAINCHAMA_ADDRESS, CHAINCHAMA_ABI, provider);
+        const g = await contract.groups(trimmedCode);
+        
+        if (g.admin !== ethers.ZeroAddress) {
+          group = {
+            id: trimmedCode,
+            name: g.name,
+            chairmanName: "Chairman", 
+            chairmanPhone: "",
+            chairmanWallet: g.admin,
+            amount: Number(ethers.formatEther(g.contributionAmount)),
+            cycle: g.cycle.toString(),
+            minMembers: Number(g.minMembers),
+            maxMembers: Number(g.maxMembers),
+            status: g.isActive ? 'ACTIVE' : 'PENDING',
+            totalFunds: Number(ethers.formatEther(g.totalFunds)),
+            payoutIndex: Number(g.payoutIndex),
+            lastCycleStartTime: Number(g.lastCycleStartTime),
+            members: [], 
+            requests: [] 
+          };
+          setGroups(prev => [...prev, group as Group]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch group on enter:", e);
+      }
+    }
+    
+    if (group) {
+      if (group.chairmanWallet.toLowerCase() === walletAddress?.toLowerCase() || (group as any).admin?.toLowerCase() === walletAddress?.toLowerCase()) {
+        setCurrentUserRole('chairman');
+        setCurrentView('dashboard');
+      } else {
+        setCurrentUserRole('member');
+        setCurrentView('member_dashboard');
+      }
+    }
+  };
+
   const handleCodeCheck = async (code: string) => {
     const trimmedCode = code.trim();
     setJoinForm(prev => ({...prev, code: trimmedCode}));
@@ -650,7 +698,7 @@ export default function Home() {
                     {myGroups.map(mg => (
                       <button
                         key={mg.id}
-                        onClick={() => handleCodeCheck(mg.id)}
+                        onClick={() => handleEnterGroup(mg.id)}
                         className="flex items-center justify-between p-4 bg-white border border-stone-200 rounded-2xl hover:border-amber-400 hover:shadow-md transition-all text-left group"
                       >
                         <div>
