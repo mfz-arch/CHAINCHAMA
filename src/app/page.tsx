@@ -232,7 +232,7 @@ export default function Home() {
         id: createForm.code,
         chairmanWallet: walletAddress,
         status: 'PENDING',
-        lastCycleStartTime: Math.floor(Date.now() / 1000),
+        lastCycleStartTime: 0,
         members: [{
           name: createForm.chairmanName,
           phone: createForm.chairmanPhone,

@@ -65,7 +65,7 @@ contract ChainChama {
             isActive: false,
             memberCount: 1,
             payoutIndex: 0,
-            lastCycleStartTime: block.timestamp
+            lastCycleStartTime: 0
         });
 
         // Admin is automatically approved and added, but hasn't contributed yet
@@ -110,6 +110,9 @@ contract ChainChama {
         
         if(groups[_code].memberCount >= groups[_code].minMembers) {
             groups[_code].isActive = true;
+            if(groups[_code].lastCycleStartTime == 0) {
+                groups[_code].lastCycleStartTime = block.timestamp;
+            }
         }
     }
 
