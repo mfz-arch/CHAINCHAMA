@@ -1,4 +1,4 @@
-export const CHAINCHAMA_ADDRESS = "0x8D34a06913401f917D7a9f44Ade5dAB5eE807cbE";
+export const CHAINCHAMA_ADDRESS = "0xde1D82547f0F47017c572bEa7990286d2aB93b13";
 
 export const CHAINCHAMA_ABI = [
   {
@@ -62,7 +62,31 @@ export const CHAINCHAMA_ABI = [
       { "internalType": "uint256", "name": "cycle", "type": "uint256" },
       { "internalType": "bool", "name": "isActive", "type": "bool" },
       { "internalType": "uint256", "name": "memberCount", "type": "uint256" },
-      { "internalType": "uint256", "name": "payoutIndex", "type": "uint256" }
+      { "internalType": "uint256", "name": "payoutIndex", "type": "uint256" },
+      { "internalType": "uint256", "name": "lastCycleStartTime", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "", "type": "address" },
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "name": "userGroups",
+    "outputs": [
+      { "internalType": "string", "name": "", "type": "string" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_user", "type": "address" }
+    ],
+    "name": "getUserGroups",
+    "outputs": [
+      { "internalType": "string[]", "name": "", "type": "string[]" }
     ],
     "stateMutability": "view",
     "type": "function"

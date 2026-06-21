@@ -19,7 +19,7 @@ if not RPC_URL or not RECOVERY_PHRASE or not GROUP_CODE:
     print("❌ Missing environment variables in .env file")
     sys.exit(1)
 
-CHAINCHAMA_ADDRESS = "0x8D34a06913401f917D7a9f44Ade5dAB5eE807cbE"
+CHAINCHAMA_ADDRESS = "0xde1D82547f0F47017c572bEa7990286d2aB93b13"
 CHAINCHAMA_ABI = [
     {
         "inputs": [{"internalType": "string", "name": "", "type": "string"}],
@@ -34,7 +34,8 @@ CHAINCHAMA_ABI = [
             {"internalType": "uint256", "name": "cycle", "type": "uint256"},
             {"internalType": "bool", "name": "isActive", "type": "bool"},
             {"internalType": "uint256", "name": "memberCount", "type": "uint256"},
-            {"internalType": "uint256", "name": "payoutIndex", "type": "uint256"}
+            {"internalType": "uint256", "name": "payoutIndex", "type": "uint256"},
+            {"internalType": "uint256", "name": "lastCycleStartTime", "type": "uint256"}
         ],
         "stateMutability": "view",
         "type": "function"
@@ -80,19 +81,26 @@ def check_and_automate():
             sys.exit(1)
 
         contributionAmount = group[5]
+        cycle_minutes = group[6]
         minMembers = group[3]
         totalFunds = group[2]
+        lastCycleStartTime = group[10]
 
         expectedFullPot = contributionAmount * minMembers
         
         funds_in_avax = w3.from_wei(totalFunds, 'ether')
         expected_in_avax = w3.from_wei(expectedFullPot, 'ether')
 
+        # Calculate time
+        current_time = int(time.time())
+        target_time = lastCycleStartTime + (cycle_minutes * 60)
+        time_remaining = max(0, target_time - current_time)
+
         # Print inline status
-        sys.stdout.write(f"\r⏳ Current Pot: {funds_in_avax} / {expected_in_avax} AVAX ")
+        sys.stdout.write(f"\r⏳ Pot: {funds_in_avax}/{expected_in_avax} AVAX | ⏱️  Time Left: {time_remaining}s   ")
         sys.stdout.flush()
 
-        if totalFunds > 0 and totalFunds >= expectedFullPot:
+        if totalFunds > 0 and totalFunds >= expectedFullPot and time_remaining == 0:
             print("\n\n🎉 POT IS FULL! Triggering Automatic Payout...")
             
             # Build and send transaction
