@@ -191,14 +191,14 @@ export default function Home() {
         const chainPayoutIndex = Number(g.payoutIndex);
         
         // If blockchain timestamp is strictly greater, it means a new cycle started (payout occurred)
-        if (chainStartTime > (activeGroup.lastCycleStartTime || 0)) {
+        if (chainStartTime > (activeGroup.lastCycleStartTime || 0) && chainStartTime > 0) {
           const recipient = activeGroup.members[activeGroup.payoutIndex % activeGroup.members.length];
           
           setRecentPayouts(prev => [{
             recipientName: recipient?.name || "Member",
             recipientWallet: recipient?.walletAddress || "0x...",
             amount: activeGroup.amount * activeGroup.members.length,
-            txHash: "0xBotAutomatedPayout...",
+            txHash: "0xAutomatedPayout...",
             timestamp: Date.now()
           }, ...prev]);
           
@@ -215,6 +215,7 @@ export default function Home() {
             return grp;
           }));
           
+          showToast(`New Cycle Started! Payout sent to ${recipient?.name || "Member"}`, "success");
         }
       } catch(e) { }
     };
