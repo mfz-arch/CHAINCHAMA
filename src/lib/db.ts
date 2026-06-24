@@ -79,8 +79,8 @@ export const getUserGroupsDb = async (walletAddress: string): Promise<Group[]> =
   
   const querySnapshot = await getDocs(q);
   const groups: Group[] = [];
-  querySnapshot.forEach((doc) => {
-    groups.push(doc.data() as Group);
+  querySnapshot.forEach((docSnap) => {
+    groups.push(docSnap.data() as Group);
   });
   
   return groups;
