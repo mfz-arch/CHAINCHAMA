@@ -47,7 +47,7 @@ Follow these instructions to run the entire ChamaCircle ecosystem locally on you
 ### 1. Clone & Install Dependencies
 First, clone the repository and install the frontend dependencies:
 ```bash
-git clone https://github.com/mfz-arch/CHAINCHAMA.git chamacircle
+git clone https://github.com/mfz-arch/chamacircle.git chamacircle
 cd chamacircle
 npm install
 ```
@@ -110,8 +110,8 @@ You should see `🚀 ChamaCircle Express Bot listening on port 3001` and `🔗 C
 
 ## 🔗 Hackathon Links
 
-- **Website (Testnet):** [Insert Vercel Link Here]
-- **Smart Contract (Fuji):** [Insert Snowtrace Link Here]
-- **Automation Bot:** [Insert Render URL Here]
+- **Website (Testnet):** [https://chamacircle.vercel.app/](https://chamacircle.vercel.app/)
+- **Smart Contract (Fuji):** [Snowtrace (0x768C862BC834b0f173Ccef435488ab39D30FF8a8)](https://testnet.snowtrace.io/address/0x768C862BC834b0f173Ccef435488ab39D30FF8a8)
+- **Automation Bot:** [https://chamacircle-bot.onrender.com](https://chamacircle-bot.onrender.com)
 
 **Built with ❤️ for the Global Web3 Hackathon**
