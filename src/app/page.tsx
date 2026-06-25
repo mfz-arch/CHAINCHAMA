@@ -139,7 +139,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [activeGroup?.lastCycleStartTime, activeGroup?.cycle]);
 
-  // Blockchain Polling for Automated Bot Payouts
+  // Blockchain Polling for Automated Bot Payouts and Contribution Status
   useEffect(() => {
     if (!activeGroup || activeGroup.status !== 'ACTIVE' || !CHAMACIRCLE_ADDRESS || CHAMACIRCLE_ADDRESS.includes("YOUR_CONTRACT_ADDRESS") || typeof window === 'undefined') return;
     
@@ -151,6 +151,22 @@ export default function Home() {
         
         const chainStartTime = Number(g.lastCycleStartTime);
         const chainPayoutIndex = Number(g.payoutIndex);
+        const chainTotalFunds = Number(ethers.formatEther(g.totalFunds));
+        
+        // Fetch real-time contribution status for all members
+        let statusesChanged = false;
+        const updatedMembers = await Promise.all(activeGroup.members.map(async (m) => {
+          try {
+            const memberData = await contract.members(activeGroup.id, m.walletAddress);
+            const hasContributedOnChain = memberData[3]; // 4th item in MemberData is hasContributed
+            if (m.hasContributed !== hasContributedOnChain) {
+              statusesChanged = true;
+            }
+            return { ...m, hasContributed: hasContributedOnChain };
+          } catch(err) {
+            return m;
+          }
+        }));
         
         // If blockchain timestamp is strictly greater, it means a new cycle started (payout occurred)
         if (chainStartTime > (activeGroup.lastCycleStartTime || 0) && chainStartTime > 0) {
@@ -180,6 +196,14 @@ export default function Home() {
           }));
           
           showToast(`New Cycle Started! Payout sent to ${recipient?.name || "Member"}`, "success");
+        } else if (statusesChanged || activeGroup.totalFunds !== chainTotalFunds) {
+          // If no new cycle started, but someone paid, sync the green "Paid" tags and Total Pot!
+          setGroups(prev => prev.map(grp => {
+            if (grp.id === activeGroup.id) {
+              return { ...grp, members: updatedMembers, totalFunds: chainTotalFunds };
+            }
+            return grp;
+          }));
         }
       } catch(e) { }
     };

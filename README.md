@@ -1,51 +1,21 @@
-# ChamaCircle 🔗💸
+# 💸 ChamaCircle
+**Community Savings, Secured by Trust on Avalanche.**
 
-**Track 1: Financial Inclusion & Payments**
+ChamaCircle brings the traditional East African rotating savings and credit association (Chama) to the blockchain. It offers transparent, trustless, and fully automated savings groups where members contribute periodically and receive payouts on a rotating schedule.
 
-## 🛑 The Problem
-Traditional savings groups (Chamas) are an essential part of the African economy, but they rely heavily on physical cash and manual trust. If a chairman mismanages funds or members fail to track contributions accurately, the entire group suffers. There is a lack of transparency, security, and automated accountability.
+## 🔗 Live Links
+- **Website (Testnet):** [Insert your Vercel link here]
+- **Smart Contract (Fuji):** `0x768C862BC834b0f173Ccef435488ab39D30FF8a8`
 
-## 💡 The Solution
-**ChamaCircle** is a decentralized, transparent savings group platform built on Avalanche. Instead of trusting a human to hold the money, funds are securely locked in a Smart Contract. Once the minimum member threshold is met, members contribute AVAX, and an automated backend bot seamlessly routes the payout to the correct member in a mathematically guaranteed round-robin cycle. 
-
-## ⚙️ Features
-- **Decentralized Escrow:** Smart Contracts hold all group funds, eliminating the risk of human theft.
-- **Automated Payouts:** A custom Python automation bot listens to the Avalanche blockchain and triggers payouts the exact second a cycle finishes and the pot is full.
-- **Transparent History:** Every payout and contribution is permanently recorded on the blockchain.
-- **Chairman Dashboard:** Group admins can easily accept members and monitor group health in a beautiful, responsive UI.
+## 🚀 Features
+- **Decentralized Groups:** Create savings circles with defined contribution amounts, minimum members, and cycle durations.
+- **Wallet Authentication:** Users authenticate directly with MetaMask or the Core Wallet.
+- **Round-Robin Payouts:** Funds are distributed sequentially and fairly to each member when the cycle timer completes.
+- **100% Automated Backend:** Built with a custom Node.js bot (hosted on Render) that constantly scans the blockchain and executes payouts automatically the exact second a cycle finishes. No manual triggering required!
+- **Real-time UI Sync:** The frontend queries the Avalanche testnet to provide live updates of the total pot and who has successfully paid their contribution.
 
 ## 🛠️ Tech Stack
-- **Frontend:** Next.js, React, TailwindCSS
-- **Backend Automation:** Python, Web3.py
-- **Smart Contracts:** Solidity
-- **Blockchain:** Avalanche Fuji Testnet
-- **Deployment:** Vercel
-
-## 📜 Smart Contract
-Deployed on Avalanche Fuji Testnet:
-`0x768C862BC834b0f173Ccef435488ab39D30FF8a8`
-
-## 🚀 How to Run Locally
-
-### 1. Start the Frontend
-```bash
-npm install
-npm run dev
-```
-Open `http://localhost:3000` in your browser.
-
-### 2. Start the Automation Bot
-```bash
-cd bot
-pip install web3 python-dotenv
-python3 bot.py
-```
-*Note: You must have a `.env` file with your `PRIVATE_KEY` and an Avalanche Fuji RPC URL.*
-
-## 🌍 How Avalanche is Used
-Avalanche Fuji is the core backend for our application. We use it to deploy our `ChamaCircle.sol` smart contract, which handles the complex logic of group minimums, cycle durations, and round-robin indexing. Avalanche allows us to process these Chama payouts with incredibly low gas fees and sub-second finality, which is crucial for financial inclusion applications in Africa.
-
-## 🔮 Future Improvements
-- Implement Stablecoin (USDC) support to protect members from crypto volatility.
-- Implement SMS/WhatsApp notifications when it is a member's turn to get paid.
-- Add reputation scoring based on on-time contributions.
+- **Frontend:** Next.js, Tailwind CSS, Ethers.js
+- **Backend Automation Bot:** Node.js, Express, Ethers.js
+- **Database:** Firebase (Firestore) for member profiles and off-chain metadata
+- **Blockchain:** Avalanche Fuji Testnet (Solidity Smart Contracts)
