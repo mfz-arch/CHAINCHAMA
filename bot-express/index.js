@@ -20,7 +20,7 @@ app.listen(PORT, () => {
 });
 
 // Web3 Setup
-const CHAMACIRCLE_ADDRESS = "0x7e95a47e10eBC0605b3ce04294a3324670C420Bd";
+const CHAMACIRCLE_ADDRESS = "0x768C862BC834b0f173Ccef435488ab39D30FF8a8";
 
 const CHAMACIRCLE_ABI = [
   "function getAllGroups() view returns (string[])",
@@ -30,15 +30,15 @@ const CHAMACIRCLE_ABI = [
 
 async function startAutomation() {
   const rpcUrl = process.env.RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
-  const privateKey = process.env.PRIVATE_KEY;
+  const mnemonic = process.env.MNEMONIC;
 
-  if (!privateKey || privateKey.includes("PASTE_YOUR_WALLET")) {
-    console.error("❌ ERROR: Missing PRIVATE_KEY in .env file.");
+  if (!mnemonic || mnemonic.includes("PASTE_YOUR_WALLET")) {
+    console.error("❌ ERROR: Missing MNEMONIC in .env file.");
     return;
   }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl);
-  const wallet = new ethers.Wallet(privateKey, provider);
+  const wallet = ethers.Wallet.fromPhrase(mnemonic, provider);
   const contract = new ethers.Contract(CHAMACIRCLE_ADDRESS, CHAMACIRCLE_ABI, wallet);
 
   console.log(`🔗 Connected to Avalanche Fuji`);

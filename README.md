@@ -23,7 +23,7 @@ Traditional savings groups (Chamas) are an essential part of the African economy
 
 ## 📜 Smart Contract
 Deployed on Avalanche Fuji Testnet:
-`0x7e95a47e10eBC0605b3ce04294a3324670C420Bd`
+`0x768C862BC834b0f173Ccef435488ab39D30FF8a8`
 
 ## 🚀 How to Run Locally
 

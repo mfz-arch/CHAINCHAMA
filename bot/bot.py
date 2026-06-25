@@ -19,7 +19,7 @@ if not RPC_URL or not RECOVERY_PHRASE or not GROUP_CODE:
     print("❌ Missing environment variables in .env file")
     sys.exit(1)
 
-CHAINCHAMA_ADDRESS = "0x7e95a47e10eBC0605b3ce04294a3324670C420Bd"
+CHAINCHAMA_ADDRESS = "0x768C862BC834b0f173Ccef435488ab39D30FF8a8"
 CHAINCHAMA_ABI = [
     {
         "inputs": [{"internalType": "string", "name": "", "type": "string"}],
