@@ -196,6 +196,14 @@ export default function Home() {
           }));
           
           showToast(`New Cycle Started! Payout sent to ${recipient?.name || "Member"}`, "success");
+
+          // Sync the new cycle state to Firebase so it persists across refreshes
+          updateGroupDb(activeGroup.id, {
+            lastCycleStartTime: chainStartTime,
+            payoutIndex: chainPayoutIndex,
+            totalFunds: 0,
+            members: activeGroup.members.map(m => ({ ...m, hasContributed: false }))
+          }).catch(console.error);
         } else if (statusesChanged || activeGroup.totalFunds !== chainTotalFunds) {
           // If no new cycle started, but someone paid, sync the green "Paid" tags and Total Pot!
           setGroups(prev => prev.map(grp => {
