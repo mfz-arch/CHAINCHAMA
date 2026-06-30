@@ -46,6 +46,7 @@ export interface Group {
   totalFunds?: number;
   payoutIndex?: number;
   lastCycleStartTime?: number;
+  payoutHistory?: any[];
 }
 
 const GROUPS_COLLECTION = 'groups';

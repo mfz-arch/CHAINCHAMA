@@ -32,12 +32,13 @@ export default function Home() {
       setGroups([]);
     }
   }, [walletAddress]);
-  const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
+  // Removed local recentPayouts state, it is now derived from activeGroup
   const [activeGroupCode, setActiveGroupCode] = useState<string | null>(null);
   const [myGroups, setMyGroups] = useState<{id: string, name: string}[]>([]);
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   const activeGroup = groups.find(g => g.id === activeGroupCode);
+  const recentPayouts = activeGroup?.payoutHistory || [];
   
   // Navigation & Roles
   const [currentUserRole, setCurrentUserRole] = useState<Role>(null);
@@ -173,14 +174,14 @@ export default function Home() {
           const currentIndex = activeGroup.payoutIndex || 0;
           const recipient = activeGroup.members[currentIndex % activeGroup.members.length];
           
-          setRecentPayouts(prev => [{
+          const newPayout = {
             time: new Date().toLocaleTimeString(),
             amount: activeGroup.amount * activeGroup.members.length,
             type: `Cycle Payout to ${recipient?.name || "Member"}`,
             receiverName: recipient?.name || "Member",
             receiverWallet: recipient?.walletAddress || "0x...",
             txHash: "0xAutomatedPayout..."
-          }, ...prev]);
+          };
           
           setGroups(prev => prev.map(grp => {
             if (grp.id === activeGroup.id) {
@@ -189,7 +190,8 @@ export default function Home() {
                 lastCycleStartTime: chainStartTime,
                 payoutIndex: chainPayoutIndex,
                 totalFunds: 0,
-                members: grp.members.map(m => ({ ...m, hasContributed: false }))
+                members: grp.members.map(m => ({ ...m, hasContributed: false })),
+                payoutHistory: [newPayout, ...(grp.payoutHistory || [])]
               };
             }
             return grp;
@@ -202,7 +204,8 @@ export default function Home() {
             lastCycleStartTime: chainStartTime,
             payoutIndex: chainPayoutIndex,
             totalFunds: 0,
-            members: activeGroup.members.map(m => ({ ...m, hasContributed: false }))
+            members: activeGroup.members.map(m => ({ ...m, hasContributed: false })),
+            payoutHistory: [newPayout, ...(activeGroup.payoutHistory || [])]
           }).catch(console.error);
         } else if (statusesChanged || activeGroup.totalFunds !== chainTotalFunds) {
           // If no new cycle started, but someone paid, sync the green "Paid" tags and Total Pot!
@@ -555,21 +558,26 @@ export default function Home() {
         const nextMemberName = activeGroup.members.length > currentPayoutIndex ? activeGroup.members[currentPayoutIndex].name : "the next member";
         showToast(`Contribution successfully sent to ${nextMemberName}`, "success");
         
-        // Log the recent transaction
-        setRecentPayouts(prev => [{
+        const newPayout = {
           time: new Date().toLocaleTimeString(),
           amount: activeGroup.totalFunds || 0,
           type: `Cycle Payout to ${nextMemberName}`,
           receiverName: nextMemberName,
           receiverWallet: activeGroup.members.length > currentPayoutIndex ? activeGroup.members[currentPayoutIndex].walletAddress : null,
           txHash: tx.hash
-        }, ...prev]);
+        };
 
         // Optimistically update local UI state to show empty funds, reset member payments, and rotate the payout index
         setGroups(prev => prev.map(g => {
           if (g.id === activeGroup.id) {
             const resetMembers = g.members.map(m => ({ ...m, hasContributed: false }));
-            return { ...g, totalFunds: 0, members: resetMembers, payoutIndex: (currentPayoutIndex + 1) % g.members.length };
+            return { 
+              ...g, 
+              totalFunds: 0, 
+              members: resetMembers, 
+              payoutIndex: (currentPayoutIndex + 1) % g.members.length,
+              payoutHistory: [newPayout, ...(g.payoutHistory || [])] 
+            };
           }
           return g;
         }));
